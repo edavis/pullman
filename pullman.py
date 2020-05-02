@@ -3,6 +3,7 @@
 import os
 import re
 import pytz
+import json
 import frontmatter
 from datetime import datetime
 from SimpleXMLRPCServer import SimpleXMLRPCServer
@@ -32,6 +33,16 @@ class Site(object):
 
         return slug
 
+    def AddToManifest(self, post_id):
+        if not os.path.exists('manifest.json'):
+            manifest = []
+        else:
+            manifest = json.load(open('manifest.json'))
+
+        manifest.insert(0, post_id)
+
+        json.dump(manifest, open('manifest.json', 'w'))
+
     def NewPost(self, struct, publish):
         # Create the YYYY/MM folder the content will live in
         now = datetime.now(pytz.timezone('US/Pacific'))
@@ -39,12 +50,14 @@ class Site(object):
         if not os.path.isdir(content_root):
             os.makedirs(content_root)
 
+        # Grab or create the slug and build the postid
         slug = self.ExtractSlug(now, struct)
         guid = "%s:%s/%s.md" % (self.site_id, content_root, slug)
         struct['postid'] = guid
 
         (blog_id, post_id) = guid.split(':')
 
+        # Write the post to disk
         with open(post_id, 'w') as fp:
             post = frontmatter.Post(struct['description'])
             post['title'] = struct['title']
@@ -54,6 +67,9 @@ class Site(object):
                 post[item['key']] = item['value']
 
             frontmatter.dump(post, fp)
+
+        # Add the post to the site manifest
+        self.AddToManifest(post_id)
 
         return guid
 

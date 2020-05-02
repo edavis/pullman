@@ -23,6 +23,8 @@ class Site(object):
             post = frontmatter.Post(struct['description'])
             post['title'] = struct['title']
             post['guid'] = struct['postid']
+            for item in struct['custom_fields']:
+                post[item['key']] = item['value']
             frontmatter.dump(post, fp)
         return guid
 

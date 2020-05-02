@@ -20,12 +20,18 @@ class Site(object):
         struct['postid'] = guid
         (blog_id, post_id) = guid.split(':')
         with open(post_id, 'w') as fp:
-            json.dump(struct, fp)
+            post = frontmatter.Post(struct['description'])
+            post['title'] = struct['title']
+            post['guid'] = struct['postid']
+            frontmatter.dump(post, fp)
         return guid
 
     def GetPost(self, post_id):
         with open(post_id) as fp:
-            return json.load(fp)
+            post = frontmatter.load(fp)
+        struct = post.metadata.copy()
+        struct['description'] = post.content
+        return struct
 
     def GeneratePostID(self):
         return "%s:%s.md" % (self.site_id, uuid.uuid4())

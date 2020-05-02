@@ -30,6 +30,7 @@ class Site(object):
         with open(post_id) as fp:
             post = frontmatter.load(fp)
         struct = post.metadata.copy()
+        struct['postid'] = post['guid']
         struct['description'] = post.content
         return struct
 

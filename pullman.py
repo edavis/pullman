@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-import json
-import uuid
-import pprint
-from SimpleXMLRPCServer import SimpleXMLRPCServer
-
+import os
+import re
+import pytz
 import frontmatter
+from datetime import datetime
+from SimpleXMLRPCServer import SimpleXMLRPCServer
 
 # h/t <https://gist.github.com/brentsimmons/9398899>
 # h/t <http://1998.xmlrpc.com/metaWeblogApi.html>
@@ -13,19 +13,48 @@ import frontmatter
 class Site(object):
     def __init__(self, site_id):
         self.site_id = site_id
-        self.site_root = "/Users/eric/Dropbox (Personal)/Websites/%s/" % (site_id,)
+
+    def ExtractSlug(self, now, struct):
+        slug = None
+
+        for item in struct.get('custom_fields', []):
+            if item['key'] == 'slug':
+                slug = item['value']
+                break
+
+        if not slug and struct['title']:
+            title = struct['title']
+            slug = re.sub(r'[\W_]+', '-', title.lower())
+
+        if not slug and not struct['title']:
+            now = now.replace(microsecond=0)
+            slug = re.sub(r'[\W_]+', '-', str(now))
+
+        return slug
 
     def NewPost(self, struct, publish):
-        guid = self.GeneratePostID()
+        # Create the YYYY/MM folder the content will live in
+        now = datetime.now(pytz.timezone('US/Pacific'))
+        content_root = '%d/%02d' % (now.year, now.month)
+        if not os.path.isdir(content_root):
+            os.makedirs(content_root)
+
+        slug = self.ExtractSlug(now, struct)
+        guid = "%s:%s/%s.md" % (self.site_id, content_root, slug)
         struct['postid'] = guid
+
         (blog_id, post_id) = guid.split(':')
+
         with open(post_id, 'w') as fp:
             post = frontmatter.Post(struct['description'])
             post['title'] = struct['title']
             post['guid'] = struct['postid']
-            for item in struct['custom_fields']:
+
+            for item in struct.get('custom_fields', []):
                 post[item['key']] = item['value']
+
             frontmatter.dump(post, fp)
+
         return guid
 
     def GetPost(self, post_id):
@@ -35,9 +64,6 @@ class Site(object):
         struct['postid'] = post['guid']
         struct['description'] = post.content
         return struct
-
-    def GeneratePostID(self):
-        return "%s:%s.md" % (self.site_id, uuid.uuid4())
 
 class MetaWeblogAPI(object):
     def NewPost(self, site_id, username, password, struct, publish):
